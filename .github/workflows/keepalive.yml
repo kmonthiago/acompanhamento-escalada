@@ -2,16 +2,39 @@ name: Keep Alive Render
 
 on:
   schedule:
-    # Roda a cada 4 minutos para evitar que o Render adormeça
-    - cron: '*/4 * * * *'
-  # Permite rodar manualmente se necessário
+    # Estratégia de múltiplos crons para maximizar cobertura
+    # GitHub Actions tem mínimo real de ~5min e pode atrasar/pular execuções
+    - cron: '*/5 * * * *'    # a cada 5 minutos
+    - cron: '2-59/5 * * * *' # offset de 2 min para cobrir gaps
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping API
+      - name: Ping 1 - Inicial
         run: |
-          curl -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36" \
-               https://acompanhamento-escalada.onrender.com/api/ping
+          echo "🏓 Ping 1 - $(date -u)"
+          curl -sf --max-time 30 \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            https://acompanhamento-escalada.onrender.com/api/ping || echo "⚠️ Ping 1 falhou"
+
+      - name: Aguardar 2 minutos
+        run: sleep 120
+
+      - name: Ping 2 - Reforço
+        run: |
+          echo "🏓 Ping 2 - $(date -u)"
+          curl -sf --max-time 30 \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            https://acompanhamento-escalada.onrender.com/api/ping || echo "⚠️ Ping 2 falhou"
+
+      - name: Aguardar mais 2 minutos
+        run: sleep 120
+
+      - name: Ping 3 - Final
+        run: |
+          echo "🏓 Ping 3 - $(date -u)"
+          curl -sf --max-time 30 \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" \
+            https://acompanhamento-escalada.onrender.com/api/ping || echo "⚠️ Ping 3 falhou"

@@ -14,11 +14,10 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-session": "^1.18.1",
-    "pg": "^8.13.1"
-  },
-  "devDependencies": {
+    "pg": "^8.13.1",
     "vite": "^6.2.1"
   },
+  "devDependencies": {},
   "engines": {
     "node": ">=18.0.0"
   }

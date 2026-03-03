@@ -168,12 +168,15 @@ function navigateTo(page) {
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav-link').forEach(l => l.classList.remove('active'));
 
   const pageEl = document.getElementById(`page-${page}`);
   const navEl = document.getElementById(`nav-${page}`);
+  const bnavEl = document.getElementById(`bnav-${page}`);
 
   if (pageEl) pageEl.classList.add('active');
   if (navEl) navEl.classList.add('active');
+  if (bnavEl) bnavEl.classList.add('active');
 
   // Refresh content for each page
   if (page === 'clients') renderClients();
@@ -564,22 +567,60 @@ window.deleteUser = async function (id) {
   }
 };
 
+// --- Mobile Navigation Helpers ---
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').classList.add('active');
+}
+
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').classList.remove('active');
+}
+
 // --- Init ---
 function init() {
   loadInitialData();
 
+  // Sidebar nav links
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
       navigateTo(link.dataset.page);
-      document.getElementById('sidebar').classList.remove('open');
+      closeSidebar();
     });
   });
 
-  document.getElementById('btn-logout').addEventListener('click', async () => {
+  // Bottom nav links (mobile)
+  document.querySelectorAll('.bottom-nav-link').forEach(link => {
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      navigateTo(link.dataset.page);
+    });
+  });
+
+  // Mobile hamburger menu
+  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  if (mobileMenuBtn) {
+    mobileMenuBtn.addEventListener('click', openSidebar);
+  }
+
+  // Sidebar overlay (close on click)
+  const sidebarOverlay = document.getElementById('sidebar-overlay');
+  if (sidebarOverlay) {
+    sidebarOverlay.addEventListener('click', closeSidebar);
+  }
+
+  // Logout buttons (sidebar + mobile header)
+  const logoutHandler = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/login.html';
-  });
+  };
+  document.getElementById('btn-logout').addEventListener('click', logoutHandler);
+  const mobileLogoutBtn = document.getElementById('mobile-logout-btn');
+  if (mobileLogoutBtn) {
+    mobileLogoutBtn.addEventListener('click', logoutHandler);
+  }
 
   // Client handlers
   document.getElementById('btn-add-client').addEventListener('click', () => openModal());

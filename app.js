@@ -1,5 +1,5 @@
 // ====================================
-// ClimbTracker — Main Application
+// ClimbTracker — Main Application (API Integrated)
 // ====================================
 
 import { Chart, RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend } from 'chart.js';
@@ -98,55 +98,15 @@ const CATEGORIES = [
   }
 ];
 
-// --- Storage ---
-const STORAGE_KEY = 'climbtracker_data';
-
-function loadData() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const data = JSON.parse(raw);
-      // Migrate old format: convert single assessment objects to arrays
-      if (data.assessments) {
-        for (const clientId in data.assessments) {
-          const val = data.assessments[clientId];
-          if (!Array.isArray(val)) {
-            // Old format: { finger_strength: 7, ..., date: "..." }
-            const scores = {};
-            let date = new Date().toISOString();
-            let observation = '';
-            CATEGORIES.forEach(cat => {
-              if (val[cat.id] !== undefined) scores[cat.id] = val[cat.id];
-            });
-            if (val.date) date = val.date;
-            data.assessments[clientId] = [{ scores, date, observation }];
-          }
-        }
-      }
-      return data;
-    }
-  } catch (e) {
-    console.error('Failed to load data:', e);
-  }
-  return { clients: [], assessments: {} };
-}
-
-function saveData(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
+// --- State ---
+let appData = { clients: [], assessments: {}, users: [] };
+let currentUser = null;
+let currentPage = 'clients';
+let radarChart = null;
 
 // --- Helper: get latest assessment for a client ---
 function getLatestAssessment(clientId) {
-  const arr = appData.assessments[clientId];
-  if (!arr || arr.length === 0) return null;
-  return arr[arr.length - 1];
-}
-
-// --- Helper: get previous assessment for a client ---
-function getPreviousAssessment(clientId) {
-  const arr = appData.assessments[clientId];
-  if (!arr || arr.length < 2) return null;
-  return arr[arr.length - 2];
+  return appData.assessments[clientId] || null;
 }
 
 // --- Helper: format date ---
@@ -159,10 +119,48 @@ function formatDate(dateStr) {
   }
 }
 
-// --- State ---
-let appData = loadData();
-let currentPage = 'clients';
-let radarChart = null;
+// --- API Calls ---
+async function apiCall(url, options = {}) {
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    });
+
+    if (res.status === 401) {
+      window.location.href = '/login.html';
+      return null;
+    }
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Erro na requisição');
+    return data;
+  } catch (err) {
+    showToast(err.message, 'error');
+    console.error(`API Error (${url}):`, err);
+    return null;
+  }
+}
+
+async function loadInitialData() {
+  const me = await apiCall('/api/auth/me');
+  if (!me) return;
+  currentUser = me.user;
+  document.getElementById('admin-display-name').textContent = currentUser.display_name || currentUser.username;
+
+  const [clients, assessments] = await Promise.all([
+    apiCall('/api/clients'),
+    apiCall('/api/assessments')
+  ]);
+
+  if (clients) appData.clients = clients;
+  if (assessments) appData.assessments = assessments;
+
+  renderClients();
+}
 
 // --- Router ---
 function navigateTo(page) {
@@ -182,6 +180,7 @@ function navigateTo(page) {
   if (page === 'assessment') refreshAssessmentSelect();
   if (page === 'dashboard') refreshDashboardSelect();
   if (page === 'history') refreshHistorySelect();
+  if (page === 'users') loadUsers();
 }
 
 // --- Toast ---
@@ -193,10 +192,6 @@ function showToast(message, type = 'success') {
 }
 
 // --- Clients ---
-function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2);
-}
-
 function getInitials(name) {
   return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
@@ -216,7 +211,6 @@ function renderClients() {
 
   grid.innerHTML = appData.clients.map(client => {
     const latest = getLatestAssessment(client.id);
-    const assessmentCount = appData.assessments[client.id]?.length || 0;
     return `
       <div class="client-card" data-id="${client.id}">
         <div class="client-card-header">
@@ -233,7 +227,7 @@ function renderClients() {
         <div class="client-name">${client.name}</div>
         <div class="client-meta">
           <span>${client.age} anos</span>
-          <span>${latest ? `✅ ${assessmentCount} avaliação(ões)` : '⏳ Pendente'}</span>
+          <span>${latest ? `✅ Avaliado` : '⏳ Pendente'}</span>
         </div>
         <span class="client-badge ${client.level}">${client.level}</span>
         ${client.goal ? `<div class="client-goal">"${client.goal}"</div>` : ''}
@@ -241,7 +235,6 @@ function renderClients() {
     `;
   }).join('');
 
-  // Click to go to dashboard
   grid.querySelectorAll('.client-card').forEach(card => {
     card.addEventListener('click', () => {
       const id = card.dataset.id;
@@ -258,7 +251,7 @@ function renderClients() {
   });
 }
 
-// --- Modal ---
+// --- Modals ---
 function openModal(client = null) {
   const overlay = document.getElementById('modal-overlay');
   const title = document.getElementById('modal-title');
@@ -287,50 +280,49 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.remove('active');
 }
 
-function saveClient(e) {
+async function saveClient(e) {
   e.preventDefault();
-
   const id = document.getElementById('client-id').value;
   const clientData = {
-    id: id || generateId(),
     name: document.getElementById('client-name').value.trim(),
     age: parseInt(document.getElementById('client-age').value),
     level: document.getElementById('client-level').value,
     goal: document.getElementById('client-goal').value.trim(),
-    notes: document.getElementById('client-notes').value.trim(),
-    createdAt: id ? undefined : new Date().toISOString()
+    notes: document.getElementById('client-notes').value.trim()
   };
 
+  let res;
   if (id) {
-    const idx = appData.clients.findIndex(c => c.id === id);
-    if (idx >= 0) {
-      clientData.createdAt = appData.clients[idx].createdAt;
-      appData.clients[idx] = clientData;
-    }
-    showToast('Cliente atualizado com sucesso!');
+    res = await apiCall(`/api/clients/${id}`, { method: 'PUT', body: JSON.stringify(clientData) });
   } else {
-    appData.clients.push(clientData);
-    showToast('Cliente adicionado com sucesso!');
+    // Basic ID generation for backend if needed, though backend should handle it
+    clientData.id = Date.now().toString(36);
+    res = await apiCall('/api/clients', { method: 'POST', body: JSON.stringify(clientData) });
   }
 
-  saveData(appData);
-  closeModal();
-  renderClients();
+  if (res) {
+    showToast(id ? 'Cliente atualizado!' : 'Cliente adicionado!');
+    const allClients = await apiCall('/api/clients');
+    if (allClients) appData.clients = allClients;
+    closeModal();
+    renderClients();
+  }
 }
 
-// Global functions for onclick handlers
 window.editClient = function (id) {
   const client = appData.clients.find(c => c.id === id);
   if (client) openModal(client);
 };
 
-window.deleteClient = function (id) {
+window.deleteClient = async function (id) {
   if (confirm('Tem certeza que deseja excluir este cliente?')) {
-    appData.clients = appData.clients.filter(c => c.id !== id);
-    delete appData.assessments[id];
-    saveData(appData);
-    renderClients();
-    showToast('Cliente excluído', 'error');
+    const res = await apiCall(`/api/clients/${id}`, { method: 'DELETE' });
+    if (res) {
+      appData.clients = appData.clients.filter(c => c.id !== id);
+      delete appData.assessments[id];
+      renderClients();
+      showToast('Cliente excluído', 'error');
+    }
   }
 };
 
@@ -345,22 +337,13 @@ function refreshAssessmentSelect() {
 
 function onAssessmentClientSelect(clientId) {
   const form = document.getElementById('assessment-form');
-
   if (!clientId) {
     form.style.display = 'none';
     return;
   }
-
   form.style.display = 'block';
-
-  // Set default date to today
-  const dateInput = document.getElementById('assessment-date');
-  const today = new Date().toISOString().split('T')[0];
-  dateInput.value = today;
-
-  // Clear observation
+  document.getElementById('assessment-date').value = new Date().toISOString().split('T')[0];
   document.getElementById('assessment-observation').value = '';
-
   renderSliders(clientId);
 }
 
@@ -380,56 +363,39 @@ function renderSliders(clientId) {
         <p class="slider-description">${cat.description}</p>
         <input type="range" class="slider-input" id="slider-${cat.id}"
           min="1" max="10" step="1" value="${value}"
-          data-category="${cat.id}"
           oninput="document.getElementById('val-${cat.id}').textContent = this.value">
-        <div class="slider-scale">
-          <span>1</span>
-          <span>Fraco</span>
-          <span>Médio</span>
-          <span>Forte</span>
-          <span>10</span>
-        </div>
       </div>
     `;
   }).join('');
 }
 
-function saveAssessment(e) {
+async function saveAssessment(e) {
   e.preventDefault();
-
   const clientId = document.getElementById('assessment-client-select').value;
   if (!clientId) return;
 
   const scores = {};
   CATEGORIES.forEach(cat => {
-    const slider = document.getElementById(`slider-${cat.id}`);
-    scores[cat.id] = parseInt(slider.value);
+    scores[cat.id] = parseInt(document.getElementById(`slider-${cat.id}`).value);
   });
 
-  const date = document.getElementById('assessment-date').value || new Date().toISOString().split('T')[0];
-  const observation = document.getElementById('assessment-observation').value.trim();
-
-  const assessmentEntry = {
+  const body = {
+    clientId,
     scores,
-    date: new Date(date + 'T12:00:00').toISOString(),
-    observation
+    date: document.getElementById('assessment-date').value,
+    observation: document.getElementById('assessment-observation').value.trim()
   };
 
-  // Push to array (create if doesn't exist)
-  if (!appData.assessments[clientId]) {
-    appData.assessments[clientId] = [];
+  const res = await apiCall('/api/assessments', { method: 'POST', body: JSON.stringify(body) });
+  if (res) {
+    showToast('Avaliação salva!');
+    appData.assessments[clientId] = res; // Update latest in state
+    setTimeout(() => {
+      document.getElementById('dashboard-client-select').value = clientId;
+      navigateTo('dashboard');
+      renderDashboard(clientId);
+    }, 500);
   }
-  appData.assessments[clientId].push(assessmentEntry);
-  saveData(appData);
-
-  showToast('Avaliação salva com sucesso!');
-
-  // Navigate to dashboard
-  setTimeout(() => {
-    document.getElementById('dashboard-client-select').value = clientId;
-    navigateTo('dashboard');
-    renderDashboard(clientId);
-  }, 500);
 }
 
 // --- Dashboard ---
@@ -442,7 +408,7 @@ function refreshDashboardSelect() {
   });
 }
 
-function renderDashboard(clientId) {
+async function renderDashboard(clientId) {
   const content = document.getElementById('dashboard-content');
   const empty = document.getElementById('dashboard-empty');
   const latest = getLatestAssessment(clientId);
@@ -456,7 +422,10 @@ function renderDashboard(clientId) {
   content.style.display = 'block';
   empty.style.display = 'none';
 
-  const previous = getPreviousAssessment(clientId);
+  // Load history to get previous assessment for comparison
+  const history = await apiCall(`/api/assessments/${clientId}/history`);
+  const previous = history && history.length > 1 ? history[history.length - 2] : null;
+
   renderRadarChart(latest.scores, previous ? previous.scores : null);
   renderScores(latest.scores);
   renderSuggestions(latest.scores);
@@ -464,124 +433,49 @@ function renderDashboard(clientId) {
 
 function renderRadarChart(currentScores, previousScores) {
   const ctx = document.getElementById('radar-chart').getContext('2d');
-
   const labels = CATEGORIES.map(c => c.label);
   const currentData = CATEGORIES.map(c => currentScores[c.id] || 0);
 
   const datasets = [{
-    label: 'Avaliação Atual',
+    label: 'Atual',
     data: currentData,
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
-    borderColor: 'rgba(99, 102, 241, 0.8)',
-    borderWidth: 2,
+    backgroundColor: 'rgba(99, 102, 241, 0.2)',
+    borderColor: '#6366f1',
     pointBackgroundColor: '#6366f1',
-    pointBorderColor: '#818cf8',
-    pointBorderWidth: 2,
-    pointRadius: 5,
-    pointHoverRadius: 7,
     fill: true
   }];
 
-  // Add previous assessment overlay if exists
   if (previousScores) {
-    const prevData = CATEGORIES.map(c => previousScores[c.id] || 0);
     datasets.push({
-      label: 'Avaliação Anterior',
-      data: prevData,
-      backgroundColor: 'rgba(148, 163, 184, 0.08)',
-      borderColor: 'rgba(148, 163, 184, 0.4)',
-      borderWidth: 1.5,
+      label: 'Anterior',
+      data: CATEGORIES.map(c => previousScores[c.id] || 0),
+      backgroundColor: 'rgba(148, 163, 184, 0.1)',
+      borderColor: '#94a3b8',
       borderDash: [5, 5],
-      pointBackgroundColor: '#64748b',
-      pointBorderColor: '#94a3b8',
-      pointBorderWidth: 1,
-      pointRadius: 3,
-      pointHoverRadius: 5,
       fill: true
     });
   }
 
   if (radarChart) radarChart.destroy();
-
   radarChart = new Chart(ctx, {
     type: 'radar',
     data: { labels, datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: true,
-      plugins: {
-        legend: {
-          display: previousScores ? true : false,
-          position: 'bottom',
-          labels: {
-            color: '#94a3b8',
-            font: { family: 'Inter', size: 11 },
-            padding: 16,
-            usePointStyle: true,
-            pointStyle: 'circle'
-          }
-        },
-        tooltip: {
-          backgroundColor: 'rgba(17, 24, 39, 0.95)',
-          titleFont: { family: 'Inter', size: 13 },
-          bodyFont: { family: 'Inter', size: 12 },
-          borderColor: 'rgba(255,255,255,0.1)',
-          borderWidth: 1,
-          padding: 12,
-          cornerRadius: 8,
-          callbacks: {
-            label: (ctx) => `${ctx.dataset.label}: ${ctx.raw}/10`
-          }
-        }
-      },
-      scales: {
-        r: {
-          beginAtZero: true,
-          min: 0,
-          max: 10,
-          ticks: {
-            stepSize: 2,
-            color: 'rgba(255,255,255,0.3)',
-            backdropColor: 'transparent',
-            font: { size: 10 }
-          },
-          pointLabels: {
-            color: '#94a3b8',
-            font: { family: 'Inter', size: 11, weight: '500' },
-            padding: 15
-          },
-          grid: {
-            color: 'rgba(255,255,255,0.06)',
-            circular: true
-          },
-          angleLines: {
-            color: 'rgba(255,255,255,0.06)'
-          }
-        }
-      }
+      scales: { r: { min: 0, max: 10, ticks: { stepSize: 2, display: false } } },
+      plugins: { legend: { display: !!previousScores } }
     }
   });
 }
 
 function renderScores(scores) {
   const container = document.getElementById('scores-list');
-
   const sorted = [...CATEGORIES].sort((a, b) => (scores[a.id] || 0) - (scores[b.id] || 0));
-
   container.innerHTML = sorted.map(cat => {
-    const score = scores[cat.id] || 0;
-    const percent = (score / 10) * 100;
+    const val = scores[cat.id] || 0;
     return `
       <div class="score-item">
-        <div class="score-bar-wrap">
-          <div class="score-label">
-            <span>${cat.label}</span>
-            <span>${score}/10</span>
-          </div>
-          <div class="score-bar">
-            <div class="score-bar-fill" style="width: ${percent}%"></div>
-          </div>
-        </div>
+        <div class="score-label"><span>${cat.label}</span><span>${val}/10</span></div>
+        <div class="score-bar"><div class="score-bar-fill" style="width: ${val * 10}%"></div></div>
       </div>
     `;
   }).join('');
@@ -589,34 +483,17 @@ function renderScores(scores) {
 
 function renderSuggestions(scores) {
   const container = document.getElementById('suggestions-list');
-
-  const weak = CATEGORIES
-    .filter(cat => (scores[cat.id] || 0) <= 5)
-    .sort((a, b) => (scores[a.id] || 0) - (scores[b.id] || 0));
-
+  const weak = CATEGORIES.filter(cat => (scores[cat.id] || 0) <= 5);
   if (weak.length === 0) {
-    container.innerHTML = `
-      <div class="no-suggestions">
-        <div class="emoji">🎉</div>
-        <p>Todos os escores estão acima de 5! Excelente performance geral.</p>
-        <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 8px;">Continue mantendo o nível e considere desafios mais avançados.</p>
-      </div>
-    `;
+    container.innerHTML = '<p>Excelente! Todos os níveis acima de 5.</p>';
     return;
   }
-
-  container.innerHTML = weak.map(cat => {
-    const score = scores[cat.id] || 0;
-    return `
-      <div class="suggestion-card">
-        <div class="suggestion-category">${cat.label}</div>
-        <div class="suggestion-score">Escore atual: ${score}/10</div>
-        <ul class="suggestion-text">
-          ${cat.suggestions.map(s => `<li>${s}</li>`).join('')}
-        </ul>
-      </div>
-    `;
-  }).join('');
+  container.innerHTML = weak.map(cat => `
+    <div class="suggestion-card">
+      <div class="suggestion-category">${cat.label}</div>
+      <ul class="suggestion-text">${cat.suggestions.map(s => `<li>${s}</li>`).join('')}</ul>
+    </div>
+  `).join('');
 }
 
 // --- History ---
@@ -624,17 +501,16 @@ function refreshHistorySelect() {
   const select = document.getElementById('history-client-select');
   select.innerHTML = '<option value="">— Escolha um cliente —</option>';
   appData.clients.forEach(c => {
-    const count = appData.assessments[c.id]?.length || 0;
-    select.innerHTML += `<option value="${c.id}">${c.name} ${count > 0 ? `(${count} avaliações)` : '(sem avaliação)'}</option>`;
+    select.innerHTML += `<option value="${c.id}">${c.name}</option>`;
   });
 }
 
-function renderHistory(clientId) {
+async function renderHistory(clientId) {
   const content = document.getElementById('history-content');
   const empty = document.getElementById('history-empty');
-  const assessments = appData.assessments[clientId];
+  const history = await apiCall(`/api/assessments/${clientId}/history`);
 
-  if (!assessments || assessments.length === 0) {
+  if (!history || history.length === 0) {
     content.style.display = 'none';
     empty.style.display = 'flex';
     return;
@@ -642,128 +518,100 @@ function renderHistory(clientId) {
 
   content.style.display = 'block';
   empty.style.display = 'none';
-
   const timeline = document.getElementById('history-timeline');
 
-  // Render in reverse chronological order (latest first)
-  const sorted = [...assessments].reverse();
-
-  timeline.innerHTML = sorted.map((entry, index) => {
-    const scores = entry.scores;
-    const avg = (CATEGORIES.reduce((sum, cat) => sum + (scores[cat.id] || 0), 0) / CATEGORIES.length).toFixed(1);
-    const isLatest = index === 0;
-
+  timeline.innerHTML = [...history].reverse().map((entry, idx) => {
+    const avg = (CATEGORIES.reduce((s, c) => s + (entry.scores[c.id] || 0), 0) / CATEGORIES.length).toFixed(1);
     return `
       <div class="history-item">
         <div class="history-card">
           <div class="history-card-header">
-            <div class="history-date">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              ${formatDate(entry.date)}
-              ${isLatest ? '<span class="history-badge-latest">Mais recente</span>' : ''}
-            </div>
-            <div class="history-avg">
-              Média: <span class="history-avg-value">${avg}</span>
-            </div>
+            <div class="history-date">📅 ${formatDate(entry.date)} ${idx === 0 ? '<span class="history-badge-latest">Atual</span>' : ''}</div>
+            <div class="history-avg">Média: <span>${avg}</span></div>
           </div>
           <div class="history-scores-grid">
-            ${CATEGORIES.map(cat => {
-      const score = scores[cat.id] || 0;
-      const level = score <= 4 ? 'low' : score <= 6 ? 'medium' : 'high';
-      return `
-                <div class="history-score-badge">
-                  <span class="badge-label">${cat.label}</span>
-                  <span class="badge-value ${level}">${score}</span>
-                </div>
-              `;
-    }).join('')}
+            ${CATEGORIES.map(c => `<div class="history-score-badge"><span class="badge-label">${c.label}</span><span class="badge-value">${entry.scores[c.id] || 0}</span></div>`).join('')}
           </div>
-          ${entry.observation ? `
-            <div class="history-observation">
-              <div class="history-observation-label">📝 Observação</div>
-              <div class="history-observation-text">${entry.observation}</div>
-            </div>
-          ` : ''}
+          ${entry.observation ? `<div class="history-observation"><div class="history-observation-text">${entry.observation}</div></div>` : ''}
         </div>
       </div>
     `;
   }).join('');
 }
 
-// --- Mobile Menu ---
-function setupMobile() {
-  if (window.innerWidth <= 768) {
-    if (!document.querySelector('.mobile-menu-btn')) {
-      const btn = document.createElement('button');
-      btn.className = 'mobile-menu-btn';
-      btn.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
-      btn.addEventListener('click', () => {
-        document.getElementById('sidebar').classList.toggle('open');
-      });
-      document.body.appendChild(btn);
-    }
-  }
+// --- Users ---
+async function loadUsers() {
+  const users = await apiCall('/api/users');
+  if (!users) return;
+  const list = document.getElementById('users-list');
+  list.innerHTML = users.map(u => `
+    <div class="client-card">
+      <div class="client-name">${u.display_name || u.username}</div>
+      <div class="client-meta">usuário: <strong>${u.username}</strong> | role: ${u.role}</div>
+      <button class="btn btn-ghost" style="margin-top:10px; color:var(--danger)" onclick="deleteUser(${u.id})">Excluir</button>
+    </div>
+  `).join('');
+
+  // Populate client select for binding
+  const select = document.getElementById('user-client-id');
+  select.innerHTML = '<option value="">— Sem vínculo —</option>';
+  appData.clients.forEach(c => select.innerHTML += `<option value="${c.id}">${c.name}</option>`);
 }
+
+window.deleteUser = async function (id) {
+  if (confirm('Excluir este usuário?')) {
+    if (await apiCall(`/api/users/${id}`, { method: 'DELETE' })) loadUsers();
+  }
+};
 
 // --- Init ---
 function init() {
-  // Navigation
+  loadInitialData();
+
   document.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      const page = link.dataset.page;
-      navigateTo(page);
-      // Close mobile menu
+      navigateTo(link.dataset.page);
       document.getElementById('sidebar').classList.remove('open');
     });
   });
 
-  // Client modal
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login.html';
+  });
+
+  // Client handlers
   document.getElementById('btn-add-client').addEventListener('click', () => openModal());
-  document.getElementById('btn-add-client-empty').addEventListener('click', () => openModal());
   document.getElementById('modal-close').addEventListener('click', closeModal);
-  document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('client-form').addEventListener('submit', saveClient);
 
-  // Close modal on overlay click
-  document.getElementById('modal-overlay').addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) closeModal();
+  // User handlers
+  document.getElementById('btn-add-user').addEventListener('click', () => {
+    document.getElementById('user-modal-overlay').classList.add('active');
+  });
+  document.getElementById('user-modal-close').addEventListener('click', () => document.getElementById('user-modal-overlay').classList.remove('active'));
+  document.getElementById('user-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body = {
+      username: document.getElementById('user-username').value,
+      password: document.getElementById('user-password').value,
+      role: document.getElementById('user-role').value,
+      display_name: document.getElementById('user-display-name').value,
+      clientId: document.getElementById('user-client-id').value || null
+    };
+    if (await apiCall('/api/users', { method: 'POST', body: JSON.stringify(body) })) {
+      showToast('Usuário criado!');
+      document.getElementById('user-modal-overlay').classList.remove('active');
+      loadUsers();
+    }
   });
 
-  // Close modal on Escape
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeModal();
-  });
-
-  // Assessment
-  document.getElementById('assessment-client-select').addEventListener('change', (e) => {
-    onAssessmentClientSelect(e.target.value);
-  });
+  // Select handlers
+  document.getElementById('assessment-client-select').addEventListener('change', (e) => onAssessmentClientSelect(e.target.value));
   document.getElementById('assessment-form').addEventListener('submit', saveAssessment);
-
-  // Dashboard
-  document.getElementById('dashboard-client-select').addEventListener('change', (e) => {
-    if (e.target.value) renderDashboard(e.target.value);
-    else {
-      document.getElementById('dashboard-content').style.display = 'none';
-    }
-  });
-
-  // History
-  document.getElementById('history-client-select').addEventListener('change', (e) => {
-    if (e.target.value) renderHistory(e.target.value);
-    else {
-      document.getElementById('history-content').style.display = 'none';
-      document.getElementById('history-empty').style.display = 'none';
-    }
-  });
-
-  // Mobile
-  setupMobile();
-  window.addEventListener('resize', setupMobile);
-
-  // Initial render
-  renderClients();
+  document.getElementById('dashboard-client-select').addEventListener('change', (e) => e.target.value && renderDashboard(e.target.value));
+  document.getElementById('history-client-select').addEventListener('change', (e) => e.target.value && renderHistory(e.target.value));
 }
 
 document.addEventListener('DOMContentLoaded', init);

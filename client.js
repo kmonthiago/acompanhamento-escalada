@@ -1,5 +1,5 @@
 // ====================================
-// ClimbTracker — Client Portal Logic
+// ClimbTracker — Client Portal Logic (API Integrated)
 // ====================================
 
 import { Chart, RadarController, RadialLinearScale, PointElement, LineElement, Filler, Tooltip } from 'chart.js';
@@ -104,6 +104,7 @@ async function loadClientData(clientId) {
 
 // --- Render Profile ---
 function renderProfile(client) {
+    if (!client) return;
     const initials = client.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
     document.getElementById('profile-avatar').textContent = initials;
     document.getElementById('profile-name').textContent = client.name;
@@ -123,10 +124,10 @@ function renderProfile(client) {
 }
 
 // --- Render Radar Chart ---
-function renderRadarChart(assessment) {
+function renderRadarChart(scores) {
     const ctx = document.getElementById('radar-chart').getContext('2d');
     const labels = CATEGORIES.map(c => c.label);
-    const data = CATEGORIES.map(c => assessment[c.id] || 0);
+    const data = CATEGORIES.map(c => scores[c.id] || 0);
 
     if (radarChart) radarChart.destroy();
 
@@ -182,12 +183,12 @@ function renderRadarChart(assessment) {
 }
 
 // --- Render Scores ---
-function renderScores(assessment) {
+function renderScores(scores) {
     const container = document.getElementById('scores-list');
-    const sorted = [...CATEGORIES].sort((a, b) => (assessment[a.id] || 0) - (assessment[b.id] || 0));
+    const sorted = [...CATEGORIES].sort((a, b) => (scores[a.id] || 0) - (scores[b.id] || 0));
 
     container.innerHTML = sorted.map(cat => {
-        const score = assessment[cat.id] || 0;
+        const score = scores[cat.id] || 0;
         const percent = (score / 10) * 100;
         return `
       <div class="score-item">
@@ -203,19 +204,19 @@ function renderScores(assessment) {
     }).join('');
 
     // Overall score
-    const total = CATEGORIES.reduce((sum, cat) => sum + (assessment[cat.id] || 0), 0);
+    const total = CATEGORIES.reduce((sum, cat) => sum + (scores[cat.id] || 0), 0);
     const avg = (total / CATEGORIES.length).toFixed(1);
     document.getElementById('overall-value').textContent = `${avg}/10`;
 }
 
 // --- Render Suggestions ---
-function renderSuggestions(assessment) {
+function renderSuggestions(scores) {
     const section = document.getElementById('suggestions-section');
     const container = document.getElementById('suggestions-list');
 
     const weak = CATEGORIES
-        .filter(cat => (assessment[cat.id] || 0) <= 5)
-        .sort((a, b) => (assessment[a.id] || 0) - (assessment[b.id] || 0));
+        .filter(cat => (scores[cat.id] || 0) <= 5)
+        .sort((a, b) => (scores[a.id] || 0) - (scores[b.id] || 0));
 
     if (weak.length === 0) {
         section.style.display = 'none';
@@ -224,7 +225,7 @@ function renderSuggestions(assessment) {
 
     section.style.display = 'block';
     container.innerHTML = weak.map(cat => {
-        const score = assessment[cat.id] || 0;
+        const score = scores[cat.id] || 0;
         return `
       <div class="suggestion-card">
         <div class="suggestion-category">${cat.label}</div>
@@ -248,11 +249,12 @@ function renderHistory(history) {
     }
 
     section.style.display = 'block';
-    container.innerHTML = history.map((entry, idx) => {
+    container.innerHTML = history.reverse().map((entry, idx) => {
         const date = new Date(entry.date).toLocaleDateString('pt-BR', {
             day: '2-digit', month: 'long', year: 'numeric'
         });
-        const total = CATEGORIES.reduce((sum, cat) => sum + (entry[cat.id] || 0), 0);
+        const scores = entry.scores;
+        const total = CATEGORIES.reduce((sum, cat) => sum + (scores[cat.id] || 0), 0);
         const avg = (total / CATEGORIES.length).toFixed(1);
 
         return `
@@ -266,10 +268,11 @@ function renderHistory(history) {
             ${CATEGORIES.map(cat => `
               <div class="history-score-item">
                 <span>${cat.label}</span>
-                <span>${entry[cat.id] || 0}/10</span>
+                <span>${scores[cat.id] || 0}/10</span>
               </div>
             `).join('')}
           </div>
+          ${entry.observation ? `<div class="history-observation">${entry.observation}</div>` : ''}
         </div>
       </div>
     `;
@@ -281,8 +284,13 @@ async function init() {
     currentUser = await checkAuth();
     if (!currentUser) return;
 
-    document.getElementById('user-greeting').textContent = `Olá, ${currentUser.displayName}`;
+    document.getElementById('user-greeting').textContent = `Olá, ${currentUser.display_name || currentUser.username}`;
     document.getElementById('btn-logout').addEventListener('click', logout);
+
+    if (!currentUser.clientId) {
+        document.getElementById('loading-state').innerHTML = `<p>Usuário sem cliente vinculado. Contate o administrador.</p>`;
+        return;
+    }
 
     try {
         const { client, assessment, history } = await loadClientData(currentUser.clientId);
@@ -293,12 +301,12 @@ async function init() {
 
         renderProfile(client);
 
-        if (assessment) {
+        if (assessment && assessment.scores) {
             document.getElementById('no-assessment').style.display = 'none';
             document.getElementById('current-assessment').style.display = 'block';
-            renderRadarChart(assessment);
-            renderScores(assessment);
-            renderSuggestions(assessment);
+            renderRadarChart(assessment.scores);
+            renderScores(assessment.scores);
+            renderSuggestions(assessment.scores);
         } else {
             document.getElementById('no-assessment').style.display = 'flex';
             document.getElementById('current-assessment').style.display = 'none';

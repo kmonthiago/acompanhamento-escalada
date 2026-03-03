@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Meu Painel — ClimbTracker">
+    <title>Meu Painel — ClimbTracker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/client.css">
+</head>
+
+<body>
+    <!-- Header -->
+    <header id="client-header" class="client-header">
+        <div class="header-brand">
+            <span class="header-icon">🧗</span>
+            <span class="header-title">ClimbTracker</span>
+        </div>
+        <div class="header-right">
+            <span id="user-greeting" class="user-greeting"></span>
+            <button id="btn-logout" class="btn-logout" title="Sair">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main id="client-main" class="client-main">
+        <!-- Loading -->
+        <div id="loading-state" class="loading-state">
+            <div class="loader"></div>
+            <p>Carregando seus dados...</p>
+        </div>
+
+        <!-- Content (hidden until loaded) -->
+        <div id="client-content" style="display:none;">
+            <!-- Profile Card -->
+            <section class="profile-section">
+                <div class="profile-card">
+                    <div class="profile-avatar" id="profile-avatar"></div>
+                    <div class="profile-info">
+                        <h2 id="profile-name"></h2>
+                        <div class="profile-meta">
+                            <span id="profile-age"></span>
+                            <span class="profile-divider">•</span>
+                            <span id="profile-level" class="profile-badge"></span>
+                        </div>
+                        <p id="profile-goal" class="profile-goal"></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Current Assessment -->
+            <section class="section">
+                <h2 class="section-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+                        <path d="M22 12A10 10 0 0 0 12 2v10z" />
+                    </svg>
+                    Minha Performance Atual
+                </h2>
+                <div id="no-assessment" class="empty-card" style="display:none;">
+                    <div class="empty-icon">📊</div>
+                    <p>Nenhuma avaliação realizada ainda.</p>
+                    <p class="text-muted">Aguarde seu treinador realizar sua avaliação.</p>
+                </div>
+                <div id="current-assessment" style="display:none;">
+                    <div class="assessment-grid">
+                        <div class="chart-card">
+                            <canvas id="radar-chart"></canvas>
+                        </div>
+                        <div class="scores-card">
+                            <div id="scores-list" class="scores-list"></div>
+                            <div class="overall-score">
+                                <span class="overall-label">Score Geral</span>
+                                <span id="overall-value" class="overall-value"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Training Suggestions -->
+            <section id="suggestions-section" class="section" style="display:none;">
+                <h2 class="section-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="16" />
+                        <line x1="8" y1="12" x2="16" y2="12" />
+                    </svg>
+                    Sugestões de Treino
+                </h2>
+                <div id="suggestions-list" class="suggestions-grid"></div>
+            </section>
+
+            <!-- History -->
+            <section id="history-section" class="section" style="display:none;">
+                <h2 class="section-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    Histórico de Avaliações
+                </h2>
+                <div id="history-list" class="history-list"></div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Toast -->
+    <div id="toast" class="toast"></div>
+
+    <script type="module" src="/client.js"></script>
+</body>
+
+</html>

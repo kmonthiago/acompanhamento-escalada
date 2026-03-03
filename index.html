@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Aplicação de acompanhamento de clientes de personal training de escalada">
+  <title>ClimbTracker — Acompanhamento de Escalada</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+  <div id="app">
+    <!-- Sidebar Navigation -->
+    <nav id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">🧗</div>
+        <span class="brand-text">ClimbTracker</span>
+      </div>
+      <ul class="nav-list">
+        <li>
+          <a href="#" data-page="clients" class="nav-link active" id="nav-clients">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            <span>Clientes</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" data-page="assessment" class="nav-link" id="nav-assessment">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+              <polyline points="10 9 9 9 8 9" />
+            </svg>
+            <span>Avaliação</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" data-page="dashboard" class="nav-link" id="nav-dashboard">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+              <path d="M22 12A10 10 0 0 0 12 2v10z" />
+            </svg>
+            <span>Dashboard</span>
+          </a>
+        </li>
+        <li>
+          <a href="#" data-page="history" class="nav-link" id="nav-history">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            <span>Histórico</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Main Content -->
+    <main id="main-content">
+      <!-- Page: Clients -->
+      <section id="page-clients" class="page active">
+        <div class="page-header">
+          <div>
+            <h1>Clientes</h1>
+            <p class="page-subtitle">Gerencie seus clientes de personal training</p>
+          </div>
+          <button class="btn btn-primary" id="btn-add-client">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Novo Cliente
+          </button>
+        </div>
+        <div id="clients-grid" class="clients-grid">
+          <!-- Cards de clientes serão renderizados aqui -->
+        </div>
+        <div id="empty-clients" class="empty-state" style="display:none;">
+          <div class="empty-icon">🧗‍♂️</div>
+          <h3>Nenhum cliente cadastrado</h3>
+          <p>Comece adicionando seu primeiro cliente</p>
+          <button class="btn btn-primary" id="btn-add-client-empty">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Adicionar Cliente
+          </button>
+        </div>
+      </section>
+
+      <!-- Page: Assessment -->
+      <section id="page-assessment" class="page">
+        <div class="page-header">
+          <div>
+            <h1>Avaliação Física</h1>
+            <p class="page-subtitle">Avalie as características do seu cliente</p>
+          </div>
+        </div>
+        <div id="assessment-select-client" class="assessment-select">
+          <label for="assessment-client-select">Selecione o cliente:</label>
+          <select id="assessment-client-select" class="select-input">
+            <option value="">— Escolha um cliente —</option>
+          </select>
+        </div>
+        <form id="assessment-form" class="assessment-form" style="display:none;">
+          <div class="assessment-meta-fields">
+            <div class="form-group">
+              <label for="assessment-date">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                Data da Avaliação
+              </label>
+              <input type="date" id="assessment-date" class="form-input">
+            </div>
+            <div class="form-group">
+              <label for="assessment-observation">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Observação do Treinador
+              </label>
+              <textarea id="assessment-observation" class="form-input form-textarea" rows="3"
+                placeholder="Registre observações sobre o desempenho, evolução, limitações percebidas..."></textarea>
+            </div>
+          </div>
+          <div class="assessment-grid" id="assessment-sliders">
+            <!-- Sliders serão renderizados via JS -->
+          </div>
+          <div class="assessment-actions">
+            <button type="submit" class="btn btn-primary btn-lg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                <polyline points="17 21 17 13 7 13 7 21" />
+                <polyline points="7 3 7 8 15 8" />
+              </svg>
+              Salvar Avaliação
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Page: Dashboard -->
+      <section id="page-dashboard" class="page">
+        <div class="page-header">
+          <div>
+            <h1>Dashboard</h1>
+            <p class="page-subtitle">Visualize a performance dos seus clientes</p>
+          </div>
+        </div>
+        <div id="dashboard-select-client" class="assessment-select">
+          <label for="dashboard-client-select">Selecione o cliente:</label>
+          <select id="dashboard-client-select" class="select-input">
+            <option value="">— Escolha um cliente —</option>
+          </select>
+        </div>
+        <div id="dashboard-content" style="display:none;">
+          <div class="dashboard-grid">
+            <div class="dashboard-card card-chart">
+              <h2>Perfil de Performance</h2>
+              <div class="chart-container">
+                <canvas id="radar-chart"></canvas>
+              </div>
+            </div>
+            <div class="dashboard-card card-scores">
+              <h2>Escores por Categoria</h2>
+              <div id="scores-list" class="scores-list">
+                <!-- Scores renderizados via JS -->
+              </div>
+            </div>
+          </div>
+          <div class="dashboard-card card-suggestions">
+            <h2>🎯 Sugestões de Treino</h2>
+            <p class="suggestions-subtitle">Iniciativas recomendadas para as categorias com maior potencial de melhoria
+            </p>
+            <div id="suggestions-list" class="suggestions-grid">
+              <!-- Sugestões renderizadas via JS -->
+            </div>
+          </div>
+        </div>
+        <div id="dashboard-empty" class="empty-state" style="display:none;">
+          <div class="empty-icon">📊</div>
+          <h3>Nenhuma avaliação encontrada</h3>
+          <p>Faça uma avaliação para visualizar o dashboard</p>
+        </div>
+      </section>
+
+      <!-- Page: History -->
+      <section id="page-history" class="page">
+        <div class="page-header">
+          <div>
+            <h1>Histórico de Avaliações</h1>
+            <p class="page-subtitle">Acompanhe a evolução dos seus clientes ao longo do tempo</p>
+          </div>
+        </div>
+        <div class="assessment-select">
+          <label for="history-client-select">Selecione o cliente:</label>
+          <select id="history-client-select" class="select-input">
+            <option value="">— Escolha um cliente —</option>
+          </select>
+        </div>
+        <div id="history-content" style="display:none;">
+          <div id="history-timeline" class="history-timeline">
+            <!-- Timeline de avaliações renderizada via JS -->
+          </div>
+        </div>
+        <div id="history-empty" class="empty-state" style="display:none;">
+          <div class="empty-icon">📋</div>
+          <h3>Nenhuma avaliação registrada</h3>
+          <p>Faça a primeira avaliação para começar o histórico</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal: Add/Edit Client -->
+  <div id="modal-overlay" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modal-title">Novo Cliente</h2>
+        <button class="btn-icon" id="modal-close">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <form id="client-form" class="modal-form">
+        <input type="hidden" id="client-id">
+        <div class="form-group">
+          <label for="client-name">Nome completo</label>
+          <input type="text" id="client-name" class="form-input" placeholder="Ex: João Silva" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="client-age">Idade</label>
+            <input type="number" id="client-age" class="form-input" placeholder="25" min="5" max="99" required>
+          </div>
+          <div class="form-group">
+            <label for="client-level">Nível</label>
+            <select id="client-level" class="form-input">
+              <option value="iniciante">Iniciante</option>
+              <option value="intermediário">Intermediário</option>
+              <option value="avançado">Avançado</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="client-goal">Objetivo principal</label>
+          <input type="text" id="client-goal" class="form-input" placeholder="Ex: Enviar 7a em 6 meses">
+        </div>
+        <div class="form-group">
+          <label for="client-notes">Observações</label>
+          <textarea id="client-notes" class="form-input form-textarea" rows="3"
+            placeholder="Lesões, restrições, observações gerais..."></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-ghost" id="modal-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div id="toast" class="toast"></div>
+
+  <script type="module" src="/app.js"></script>
+</body>
+
+</html>

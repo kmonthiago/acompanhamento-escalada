@@ -409,75 +409,75 @@
             </form>
 
             <div class="login-footer">
-                <p>Powered by <strong>ClimbTracker</strong></p>
+                <p>Desenvolvido para <strong>Felipe Siqueira</strong></p>
             </div>
         </div>
     </div>
 
     <script>
-    const form = document.getElementById('login-form');
-    const errorEl = document.getElementById('login-error');
-    const btnLogin = document.getElementById('btn-login');
-    const btnText = btnLogin.querySelector('.btn-text');
-    const btnLoader = btnLogin.querySelector('.btn-loader');
+        const form = document.getElementById('login-form');
+        const errorEl = document.getElementById('login-error');
+        const btnLogin = document.getElementById('btn-login');
+        const btnText = btnLogin.querySelector('.btn-text');
+        const btnLoader = btnLogin.querySelector('.btn-loader');
 
-    async function checkAuth() {
-      try {
-        const res = await fetch('/api/auth/me');
-        if (res.ok) {
-          const data = await res.json();
-          redirectByRole(data.user.role);
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/me');
+                if (res.ok) {
+                    const data = await res.json();
+                    redirectByRole(data.user.role);
+                }
+            } catch (e) { /* not logged in */ }
         }
-      } catch (e) { /* not logged in */ }
-    }
 
-    function redirectByRole(role) {
-      if (role === 'admin') {
-        window.location.href = '/index.html';
-      } else {
-        window.location.href = '/client.html';
-      }
-    }
+        function redirectByRole(role) {
+            if (role === 'admin') {
+                window.location.href = '/index.html';
+            } else {
+                window.location.href = '/client.html';
+            }
+        }
 
-    function showError(msg) {
-      errorEl.textContent = msg;
-      errorEl.style.display = 'block';
-    }
+        function showError(msg) {
+            errorEl.textContent = msg;
+            errorEl.style.display = 'block';
+        }
 
-    function setLoading(loading) {
-      btnLogin.disabled = loading;
-      btnText.style.display = loading ? 'none' : 'inline';
-      btnLoader.style.display = loading ? 'inline-flex' : 'none';
-    }
+        function setLoading(loading) {
+            btnLogin.disabled = loading;
+            btnText.style.display = loading ? 'none' : 'inline';
+            btnLoader.style.display = loading ? 'inline-flex' : 'none';
+        }
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      errorEl.style.display = 'none';
-      setLoading(true);
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorEl.style.display = 'none';
+            setLoading(true);
 
-      try {
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            username: document.getElementById('username').value.trim(),
-            password: document.getElementById('password').value
-          })
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: document.getElementById('username').value.trim(),
+                        password: document.getElementById('password').value
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    showError(data.error || 'Erro ao fazer login');
+                    setLoading(false);
+                    return;
+                }
+                redirectByRole(data.user.role);
+            } catch (err) {
+                showError('Erro de conexão. Tente novamente.');
+                setLoading(false);
+            }
         });
-        const data = await res.json();
-        if (!res.ok) {
-          showError(data.error || 'Erro ao fazer login');
-          setLoading(false);
-          return;
-        }
-        redirectByRole(data.user.role);
-      } catch (err) {
-        showError('Erro de conexão. Tente novamente.');
-        setLoading(false);
-      }
-    });
 
-    checkAuth();
+        checkAuth();
     </script>
 </body>
 
